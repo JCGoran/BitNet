@@ -10,10 +10,10 @@
 #if defined(__clang__)
   #define UNROLL_LOOP(n)      _Pragma(TO_STRING(unroll))
 #elif defined(__GNUC__) && !defined(__clang__)
-  #if (__GNUC__ > 15) || (__GNUC__ == 14 && __GNUC_MINOR__ >= 1) || (__GNUC__ == 11 && __GNUC_MINOR__ >= 5) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 4) || (__GNUC__ == 13 && __GNUC_MINOR__ >= 3)
+  #if (__GNUC__ > 15) || (__GNUC__ == 14 && __GNUC_MINOR__ >= 1)
   #define UNROLL_LOOP(n)      _Pragma(TO_STRING(GCC unroll (n)))
   #else
-  #pragma message ("Loop unrolling for templates is only available in GCC 15, >=14.1, >=13.3, >=12.4, >=11.5")
+  #pragma message ("Loop unrolling for templates is only available in GCC 15+, and >=14.1")
   #define UNROLL_LOOP(n)
   #endif
 #elif defined(_MSC_BUILD)
