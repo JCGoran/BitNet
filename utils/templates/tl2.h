@@ -10,7 +10,12 @@
 #if defined(__clang__)
   #define UNROLL_LOOP(n)      _Pragma(TO_STRING(unroll))
 #elif defined(__GNUC__) && !defined(__clang__)
+  #if (__GNUC__ > 15) || (__GNUC__ == 14 && __GNUC_MINOR__ >= 1) || (__GNUC__ == 11 && __GNUC_MINOR__ >= 5) || (__GNUC__ == 12 && __GNUC_MINOR__ >= 4) || (__GNUC__ == 13 && __GNUC_MINOR__ >= 3)
   #define UNROLL_LOOP(n)      _Pragma(TO_STRING(GCC unroll (n)))
+  #else
+  #pragma message ("Loop unrolling for templates is only available in GCC 15, >=14.1, >=13.3, >=12.4, >=11.5")
+  #define UNROLL_LOOP(n)
+  #endif
 #elif defined(_MSC_BUILD)
   #pragma message ("Microsoft Visual C++ (MSVC) detected: Loop unrolling not supported!")
   #define UNROLL_LOOP(n)
@@ -126,7 +131,7 @@ inline int32_t three_lut_ctor(int8_t* qlut, bitnet_float_type* b, bitnet_float_t
                                             0x0f, 0x0d, 0x0b, 0x09, 0x07, 0x05, 0x03, 0x01,
                                             0x0e, 0x0c, 0x0a, 0x08, 0x06, 0x04, 0x02, 0x00
                                             );
-    #pragma unroll
+    UNROLL_LOOP(act_k / 24)
     for (int k = 0; k < act_k / 24; ++k) {
         __m256 vec_b0 = _mm256_i32gather_ps(b + k * 24 + 0, vec_bi, 1);
         __m256 vec_b1 = _mm256_i32gather_ps(b + k * 24 + 1, vec_bi, 1);
@@ -206,7 +211,7 @@ inline int32_t two_lut_ctor(int8_t* qlut, bitnet_float_type* b, bitnet_float_typ
                                             0x0f, 0x0d, 0x0b, 0x09, 0x07, 0x05, 0x03, 0x01,
                                             0x0e, 0x0c, 0x0a, 0x08, 0x06, 0x04, 0x02, 0x00
                                             );
-    #pragma unroll
+    UNROLL_LOOP(act_k / 16)
     for (int k = 0; k < act_k / 16; ++k) {
         __m256 vec_b0f = _mm256_i32gather_ps(b + k * 16 + 0, vec_bi, 1);
         __m256 vec_b1f = _mm256_i32gather_ps(b + k * 16 + 1, vec_bi, 1);
@@ -295,19 +300,19 @@ inline void three_tbl_impl_{{ pre }}(int32_t* c, int8_t* lut, uint8_t* a, uint8_
     for (int i = 0; i < BM{{ pre }}; i += 32) {
         __m256i vec_as[KK / 2];
         __m256i vec_signs[KK / 8];
-        #pragma unroll
+        UNROLL_LOOP(KK / 2)
         for (int ai = 0; ai < KK / 2; ai++) {
             vec_as[ai] = _mm256_loadu_si256(reinterpret_cast<__m256i*>(a + i * KK / 2 + ai * 32));
         }
-        #pragma unroll
+        UNROLL_LOOP(KK / 8)
         for (int as = 0; as < KK / 8; as++) {
             vec_signs[as] = _mm256_loadu_si256(reinterpret_cast<__m256i*>(sign + i * KK / 8 + as * 32));
         }
-        #pragma unroll
+        UNROLL_LOOP(batch_size)
         for (int bs = 0; bs < batch_size; bs++) {
             __m256i vec_c0 = _mm256_setzero_si256();
             __m256i vec_c1 = _mm256_setzero_si256();
-            #pragma unroll
+            UNROLL_LOOP(KK / 8)
             for (int k = 0; k < KK / 8; k++) {
                 __m256i vec_sign = vec_signs[k];
                     __m256i vec_a_0 = vec_as[k * 4 + 0];
@@ -428,15 +433,15 @@ inline int32_t two_tbl_impl{{ pre }}(int32_t* c, int8_t* lut, uint8_t* a) {
     UNROLL_LOOP(BM{{ pre }})
     for (int i = 0; i < BM{{ pre }}; i += 32) {
         __m256i vec_as[KK / 2];
-        #pragma unroll
+        UNROLL_LOOP(KK / 2)
         for (int ai = 0; ai < KK / 2; ai++) {
             vec_as[ai] = _mm256_loadu_si256(reinterpret_cast<__m256i*>(a + i * KK / 2 + ai * 32));
         }
-        #pragma unroll
+        UNROLL_LOOP(batch_size)
         for (int bs = 0; bs < batch_size; bs++) {
             __m256i vec_c0 = _mm256_setzero_si256();
             __m256i vec_c1 = _mm256_setzero_si256();
-            #pragma unroll
+            UNROLL_LOOP(KK / 8)
             for (int k = 0; k < KK / 8; k++) {
                 UNROLL_LOOP(4)
                 for (int j = 0; j < 4; j++) {
@@ -494,7 +499,7 @@ int32_t three_qgemm_lut_{{ pre }}(void* A, void* sign, void* LUT, void* Scales, 
     for (int32_t k_outer = 0; k_outer < {{ k_list_indexed[1] }} / BBK{{ pre }}; ++k_outer) {
         three_tbl_impl_{{ pre }}<BATCH_SIZE, {{ k_list_indexed[1] }}>((&(((int32_t*)CBits)[0])), (&(((int8_t*)LUT)[(k_outer * BBK{{ pre }} / 3 * 32)])), (&(((uint8_t*)A)[(k_outer * BBK{{ pre }} / 3 / 2 * BM{{ pre }})])), (&(((uint8_t*)sign)[(k_outer * BBK{{ pre }} / 3 / 8 * BM{{ pre }})])));
     }
-    #pragma unroll
+    UNROLL_LOOP(BATCH_SIZE)
     for (int bs = 0; bs < BATCH_SIZE; bs++) {
         UNROLL_LOOP(BM{{ pre }})
         for (int i = 0; i < BM{{ pre }}; i++) {
@@ -512,7 +517,7 @@ int32_t two_qgemm_lut_{{ pre }}(void* A, void* LUT, void* Scales, void* LUT_Scal
     for (int32_t k_outer = 0; k_outer < {{ k_list_indexed[0] }} / 32; ++k_outer) {
         two_tbl_impl{{ pre }}<BATCH_SIZE, {{ k_list_indexed[0] }}>((&(((int32_t*)CBits)[0])), (&(((int8_t*)LUT)[(k_outer * BK2 / 2 * 32)])), (&(((uint8_t*)A)[(k_outer * BK2 / 2 / 2 * BM{{ pre }})])));
     }
-    #pragma unroll
+    UNROLL_LOOP(BATCH_SIZE)
     for (int bs = 0; bs < BATCH_SIZE; bs++) {
         UNROLL_LOOP(BM{{ pre }})
         for (int i = 0; i < BM{{ pre }}; i++) {
